@@ -8,7 +8,11 @@ import { createReadStream } from "fs";
 import { DefaultHttpClient } from "../lib/defaultHttpClient";
 import { RestError } from "../lib/restError";
 import { isNode } from "../lib/util/utils";
-import { WebResource, HttpRequestBody, TransferProgressEvent } from "../lib/webResource";
+import {
+  WebResource,
+  HttpRequestBody,
+  TransferProgressEvent
+} from "../lib/webResource";
 import { getHttpMock, HttpMockFacade } from "./mockHttp";
 import { TestFunction } from "mocha";
 
@@ -19,13 +23,14 @@ function getAbortController(): AbortController {
   if (typeof AbortController === "function") {
     controller = new AbortController();
   } else {
-    const AbortControllerPonyfill = require("abortcontroller-polyfill/dist/cjs-ponyfill").AbortController;
+    const AbortControllerPonyfill = require("abortcontroller-polyfill/dist/cjs-ponyfill")
+      .AbortController;
     controller = new AbortControllerPonyfill();
   }
   return controller;
 }
 
-describe("defaultHttpClient", function () {
+describe("defaultHttpClient", function() {
   function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -38,7 +43,7 @@ describe("defaultHttpClient", function () {
   afterEach(() => httpMock.teardown());
   after(() => httpMock.teardown());
 
-  it("should return a response instead of throwing for awaited 404", async function () {
+  it("should return a response instead of throwing for awaited 404", async function() {
     const resourceUrl = "/nonexistent";
 
     httpMock.get(resourceUrl, async () => {
@@ -52,7 +57,7 @@ describe("defaultHttpClient", function () {
     response.status.should.equal(404);
   });
 
-  it("should allow canceling requests", async function () {
+  it("should allow canceling requests", async function() {
     const resourceUrl = `/fileupload`;
     httpMock.post(resourceUrl, async () => {
       await sleep(10000);
@@ -61,7 +66,16 @@ describe("defaultHttpClient", function () {
     });
     const controller = getAbortController();
     const veryBigPayload = "very long string";
-    const request = new WebResource(resourceUrl, "POST", veryBigPayload, undefined, undefined, true, undefined, controller.signal);
+    const request = new WebResource(
+      resourceUrl,
+      "POST",
+      veryBigPayload,
+      undefined,
+      undefined,
+      true,
+      undefined,
+      controller.signal
+    );
     const client = new DefaultHttpClient();
     const promise = client.sendRequest(request);
     controller.abort();
@@ -73,38 +87,50 @@ describe("defaultHttpClient", function () {
     }
   });
 
-  nodeIt("should not overwrite a user-provided cookie (nodejs only)", async function () {
-    // Cookie is only allowed to be set by the browser based on an actual response Set-Cookie header
-    httpMock.get("http://my.fake.domain/set-cookie", {
-      status: 200,
-      headers: {
-        "Set-Cookie": "data=123456"
-      }
-    });
-
-    httpMock.get("http://my.fake.domain/cookie", async (_url, _method, _body, headers) => {
-      return {
+  nodeIt(
+    "should not overwrite a user-provided cookie (nodejs only)",
+    async function() {
+      // Cookie is only allowed to be set by the browser based on an actual response Set-Cookie header
+      httpMock.get("http://my.fake.domain/set-cookie", {
         status: 200,
-        headers: headers
-      };
-    });
+        headers: {
+          "Set-Cookie": "data=123456"
+        }
+      });
 
-    const client = new DefaultHttpClient();
+      httpMock.get(
+        "http://my.fake.domain/cookie",
+        async (_url, _method, _body, headers) => {
+          return {
+            status: 200,
+            headers: headers
+          };
+        }
+      );
 
-    const request1 = new WebResource("http://my.fake.domain/set-cookie");
-    const response1 = await client.sendRequest(request1);
-    response1.headers.get("Set-Cookie")!.should.equal("data=123456");
+      const client = new DefaultHttpClient();
 
-    const request2 = new WebResource("http://my.fake.domain/cookie");
-    const response2 = await client.sendRequest(request2);
-    response2.headers.get("Cookie")!.should.equal("data=123456");
+      const request1 = new WebResource("http://my.fake.domain/set-cookie");
+      const response1 = await client.sendRequest(request1);
+      response1.headers.get("Set-Cookie")!.should.equal("data=123456");
 
-    const request3 = new WebResource("http://my.fake.domain/cookie", "GET", undefined, undefined, { Cookie: "data=abcdefg" });
-    const response3 = await client.sendRequest(request3);
-    response3.headers.get("Cookie")!.should.equal("data=abcdefg");
-  });
+      const request2 = new WebResource("http://my.fake.domain/cookie");
+      const response2 = await client.sendRequest(request2);
+      response2.headers.get("Cookie")!.should.equal("data=123456");
 
-  it("should allow canceling multiple requests with one token", async function () {
+      const request3 = new WebResource(
+        "http://my.fake.domain/cookie",
+        "GET",
+        undefined,
+        undefined,
+        { Cookie: "data=abcdefg" }
+      );
+      const response3 = await client.sendRequest(request3);
+      response3.headers.get("Cookie")!.should.equal("data=abcdefg");
+    }
+  );
+
+  it("should allow canceling multiple requests with one token", async function() {
     httpMock.post("/fileupload", async () => {
       await sleep(1000);
       assert.fail();
@@ -114,8 +140,26 @@ describe("defaultHttpClient", function () {
     const controller = getAbortController();
     const buf = "Very large string";
     const requests = [
-      new WebResource("/fileupload", "POST", buf, undefined, undefined, true, undefined, controller.signal),
-      new WebResource("/fileupload", "POST", buf, undefined, undefined, true, undefined, controller.signal)
+      new WebResource(
+        "/fileupload",
+        "POST",
+        buf,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        controller.signal
+      ),
+      new WebResource(
+        "/fileupload",
+        "POST",
+        buf,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        controller.signal
+      )
     ];
     const client = new DefaultHttpClient();
     const promises = requests.map(r => client.sendRequest(r));
@@ -141,18 +185,32 @@ describe("defaultHttpClient", function () {
       ev.loadedBytes.should.be.a("Number");
     };
 
-    it("for simple bodies", async function () {
+    it("for simple bodies", async function() {
       httpMock.post("/fileupload", async (_url, _method, _body) => {
-        return { status: 251, body: body.repeat(9).substring(0, 200), headers: { "Content-Length": "200" } };
+        return {
+          status: 251,
+          body: body.repeat(9).substring(0, 200),
+          headers: { "Content-Length": "200" }
+        };
       });
 
       const upload: Notified = { notified: false };
       const download: Notified = { notified: false };
 
       const body = "Very large string to upload";
-      const request = new WebResource("/fileupload", "POST", body, undefined, undefined, false, undefined, undefined, 0,
+      const request = new WebResource(
+        "/fileupload",
+        "POST",
+        body,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        undefined,
+        0,
         ev => listener(upload, ev),
-        ev => listener(download, ev));
+        ev => listener(download, ev)
+      );
 
       const client = new DefaultHttpClient();
       const response = await client.sendRequest(request);
@@ -162,7 +220,7 @@ describe("defaultHttpClient", function () {
       download.notified.should.be.true;
     });
 
-    it("for blob or stream bodies", async function () {
+    it("for blob or stream bodies", async function() {
       let payload: HttpRequestBody;
       if (isNode) {
         payload = () => createReadStream(__filename);
@@ -173,24 +231,38 @@ describe("defaultHttpClient", function () {
       const size = isNode ? payload.toString().length : undefined;
 
       httpMock.post("/bigfileupload", async (_url, _method, _body) => {
-        return { status: 250, body: payload, headers: { "Content-Type": "text/javascript", "Content-length": size } };
+        return {
+          status: 250,
+          body: payload,
+          headers: { "Content-Type": "text/javascript", "Content-length": size }
+        };
       });
 
       const upload: Notified = { notified: false };
       const download: Notified = { notified: false };
 
-      const request = new WebResource("/bigfileupload", "POST", payload, undefined, undefined, true, undefined, undefined, 0,
+      const request = new WebResource(
+        "/bigfileupload",
+        "POST",
+        payload,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        0,
         ev => listener(upload, ev),
-        ev => listener(download, ev));
+        ev => listener(download, ev)
+      );
 
       const client = new DefaultHttpClient();
       const response = await client.sendRequest(request);
       response.status.should.equal(250);
       if (response.blobBody) {
         await response.blobBody;
-      } else if ((typeof response.readableStreamBody === "function")) {
+      } else if (typeof response.readableStreamBody === "function") {
         const streamBody = (response.readableStreamBody as Function)();
-        streamBody.on("data", () => { });
+        streamBody.on("data", () => {});
         await new Promise((resolve, reject) => {
           streamBody.on("end", resolve);
           streamBody.on("error", reject);
@@ -202,10 +274,20 @@ describe("defaultHttpClient", function () {
     });
   });
 
-  it("should honor request timeouts", async function () {
+  it("should honor request timeouts", async function() {
     httpMock.timeout("GET", "/slow");
 
-    const request = new WebResource("/slow", "GET", undefined, undefined, undefined, false, false, undefined, 100);
+    const request = new WebResource(
+      "/slow",
+      "GET",
+      undefined,
+      undefined,
+      undefined,
+      false,
+      false,
+      undefined,
+      100
+    );
     const client = new DefaultHttpClient();
     try {
       await client.sendRequest(request);
@@ -215,7 +297,7 @@ describe("defaultHttpClient", function () {
     }
   });
 
-  it("should give a graceful error for nonexistent hosts", async function () {
+  it("should give a graceful error for nonexistent hosts", async function() {
     const requestUrl = "http://fake.domain";
     httpMock.passThrough();
     const request = new WebResource(requestUrl, "GET");
@@ -229,7 +311,7 @@ describe("defaultHttpClient", function () {
     }
   });
 
-  it("should interpret undefined as an empty body", async function () {
+  it("should interpret undefined as an empty body", async function() {
     const requestUrl = "/expect-empty";
     httpMock.put(requestUrl, async (_url, _method, body, _headers) => {
       if (!body) {
@@ -250,7 +332,7 @@ describe("defaultHttpClient", function () {
     response.status.should.equal(200, response.bodyAsText!);
   });
 
-  it("should send HTTP requests", async function () {
+  it("should send HTTP requests", async function() {
     httpMock.passThrough();
     const request = new WebResource("https://example.com", "GET");
     request.headers.set("Access-Control-Allow-Headers", "Content-Type");
@@ -262,10 +344,12 @@ describe("defaultHttpClient", function () {
     assert.deepEqual(response.request, request);
     assert.strictEqual(response.status, 200);
     assert(response.headers);
-    assert.strictEqual(response.headers.get("content-type")!.split(";")[0], "text/html");
+    assert.strictEqual(
+      response.headers.get("content-type")!.split(";")[0],
+      "text/html"
+    );
     const responseBody: string | null | undefined = response.bodyAsText;
-    const expectedResponseBody =
-      `<!doctype html>
+    const expectedResponseBody = `<!doctype html>
 <html>
 <head>
     <title>Example Domain</title>
@@ -278,7 +362,7 @@ describe("defaultHttpClient", function () {
         background-color: #f0f0f2;
         margin: 0;
         padding: 0;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "SegoeUI", "OpenSans", "HelveticaNeue", Helvetica, Arial, sans-serif;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
     }
     div {
@@ -310,11 +394,11 @@ describe("defaultHttpClient", function () {
     <p><a href="https://www.iana.org/domains/example">More information...</a></p>
 </div>
 </body>
-</html>
-`;
+</html>`;
     assert.strictEqual(
       responseBody && responseBody.replace(/\s/g, ""),
-      expectedResponseBody.replace(/\s/g, ""));
+      expectedResponseBody.replace(/\s/g, "")
+    );
     httpMock.teardown();
   });
 });
